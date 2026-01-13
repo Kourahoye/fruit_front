@@ -1,0 +1,393 @@
+Voici **la version Apollo Client** de tout ton code.
+➡️ On enlève tous les `fetch("http://127.0.0.1:8000/graphql/")`
+➡️ On remplace par `useQuery`, `useLazyQuery`, `useMutation`
+➡️ Moins de code, plus propre, plus rapide, plus sûr.
+
+Je t’ai entièrement converti **Filter**, **TagFilter**, **Tag**, et les requêtes.
+
+---
+
+# 🟦 1) `graphql/queries.js` (NOUVEAU FICHIER)
+
+👉 Tu mets toutes tes queries ici.
+
+```js
+import { gql } from "@apollo/client";
+
+export const GET_TAGS = gql`
+  query GetTags {
+    tags {
+      id
+      name
+    }
+  }
+`;
+
+export const GET_FRUITS = gql`
+  query GetFruits {
+    fruits {
+      id
+      name
+      nbTags
+    }
+  }
+`;
+
+export const GET_FRUITS_BY_TAGS = gql`
+  query GetFruitsByTags($incl: [String!], $excl: [String!]) {
+    getFruitByMultipleTag(incl: $incl, excl: $excl) {
+      id
+      name
+      nbTags
+    }
+  }
+`;
+```
+
+---
+
+# 🟩 2) Filter.jsx (remplace **tout** ton ancien code)
+
+```jsx
+import { useQuery } from "@apollo/client";
+import { GET_TAGS } from "../graphql/queries";
+import TagFilter from "./TagFilter";
+
+function Filter() {
+  const { data, loading, error } = useQuery(GET_TAGS);
+
+  if (loading)
+    return <p className="text-2xl text-red-500 text-center">Loading tags...</p>;
+
+  if (error)
+    return (
+      <p className="text-xl text-center text-red-600">
+        Error loading tags: {error.message}
+      </p>
+    );
+
+  return (
+    <>
+      <div className="border-2 card shadow-md bg-zinc-50 w-3/4 mx-auto my-4 glass text-black border-slate-950 p-3">
+        <TagFilter tags={data.tags} />
+      </div>
+    </>
+  );
+}
+
+export default Filter;
+```
+
+---
+
+# 🟨 3) TagFilter.jsx — **TOUTES tes requêtes converties Apollo**
+
+➡️ `useLazyQuery` pour lancer la recherche
+➡️ Plus de fetch, plus de JSON.stringify
+
+```jsx
+import { useState } from "react";
+import Tag from "./tag";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSearch } from "@fortawesome/free-solid-svg-icons";
+import { useLazyQuery } from "@apollo/client";
+import { GET_FRUITS, GET_FRUITS_BY_TAGS } from "../graphql/queries";
+
+const TagFilter = ({ tags = [] }) => {
+  const [filter, setFilter] = useState([]);
+  const [exclude, setExclude] = useState([]);
+
+  // Charger tous les fruits
+  const [loadAllFruits, { data: allFruits, loading: loadAll }] =
+    useLazyQuery(GET_FRUITS);
+
+  // Charger filtré
+  const [loadFilteredFruits, { data: filteredFruits, loading: loadFiltered }] =
+    useLazyQuery(GET_FRUITS_BY_TAGS);
+
+  const fruits = filteredFruits?.getFruitByMultipleTag || allFruits?.fruits || [];
+
+  const loading = loadAll || loadFiltered;
+
+  const handleFilter = (tag) => {
+    if (filter.includes(tag)) {
+      setFilter((prev) => prev.filter((t) => t !== tag));
+    } else {
+      setFilter((prev) => [...prev, tag]);
+      setExclude((prev) => prev.filter((t) => t !== tag));
+    }
+  };
+
+  const handleExclude = (tag) => {
+    if (exclude.includes(tag)) {
+      setExclude((prev) => prev.filter((t) => t !== tag));
+    } else {
+      setExclude((prev) => [...prev, tag]);
+      setFilter((prev) => prev.filter((t) => t !== tag));
+    }
+  };
+
+  const sendFilters = () => {
+    if (filter.length === 0 && exclude.length === 0) {
+      loadAllFruits();
+    } else {
+      loadFilteredFruits({
+        variables: {
+          incl: filter,
+          excl: exclude,
+        },
+      });
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* TAG LIST */}
+      <div className="flex flex-wrap gap-3">
+        {tags.map((t) => (
+          <Tag
+            key={"tag" + t.id}
+            tagname={t.name}
+            onFilter={handleFilter}
+            onExclude={handleExclude}
+            state={
+              filter.includes(t.name)
+                ? "filter"
+                : exclude.includes(t.name)
+                ? "exclude"
+                : "none"
+            }
+          />
+        ))}
+      </div>
+
+      {/* BUTTON */}
+      <div className="mt-3">
+        <button className="btn btn-info" onClick={sendFilters}>
+          Chercher <FontAwesomeIcon icon={faSearch} />
+        </button>
+      </div>
+
+      {/* DISPLAY FILTERS */}
+      <div className="text-black mt-2">
+        <h1>Filter</h1>
+        <p>+ Inclus : {filter.join(", ") || "Aucun"}</p>
+        <p>− Exclus : {exclude.join(", ") || "Aucun"}</p>
+      </div>
+
+      {/* FRUITS TABLE */}
+      <div className="overflow-x-auto">
+        <table className="table table-auto">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Tags</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={3} className="loading loading-bars"></td>
+              </tr>
+            ) : fruits.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="text-center text-xl text-red-500">
+                  No fruits with these filters
+                </td>
+              </tr>
+            ) : (
+              fruits.map((fruit) => (
+                <tr key={"fruit" + fruit.id}>
+                  <td>{fruit.id}</td>
+                  <td>{fruit.name}</td>
+                  <td>
+                    <span className="badge badge-info badge-sm">{fruit.nbTags}</span>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+export default TagFilter;
+```
+
+---
+
+# 🟧 4) Tag.jsx → **ce fichier ne change pas**
+
+Tu peux garder exactement ça :
+
+```jsx
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faPlus, faMinus } from "@fortawesome/free-solid-svg-icons";
+
+const Tag = ({ tagname, onFilter, onExclude, state }) => {
+  const base =
+    "flex gap-3 border text-white font-semibold items-center justify-around rounded-lg uppercase cursor-pointer bg-blue-800 border-amber-50";
+
+  return (
+    <div className={base}>
+      <button
+        className={`btn btn-xs ${state == "filter" ? "btn-success" : "btn-ghost"}`}
+        onClick={() => onFilter(tagname)}
+      >
+        <FontAwesomeIcon icon={faPlus} />
+      </button>
+      <span>{tagname}</span>
+      <button
+        className={`btn btn-xs ${state == "exclude" ? "btn-error" : "btn-ghost"}`}
+        onClick={() => onExclude(tagname)}
+      >
+        <FontAwesomeIcon icon={faMinus} />
+      </button>
+    </div>
+  );
+};
+
+export default Tag;
+```
+
+---
+
+# 🎉 Résultat final
+
+✔ Ton code devient **propre**
+✔ Plus rapide (Apollo cache les données)
+✔ Plus simple (0 fetch, 0 JSON.stringify)
+✔ Plus professionnel
+✔ Compatible login/token plus tard
+
+---
+
+Si tu veux, je peux te faire :
+
+🔸 le système complet d’auth GraphQL Strawberry (login + JWT)
+🔸 un `useAuth()` pour React
+🔸 un composant **PrivateRoute** (protège les pages)
+🔸 un hook `useFruits()` pour simplifier encore ton filtre
+
+Dis-moi ce que tu veux ajouter !
+
+// const Tag = ({tagname})=>{
+//     return <div className="flex gap-3 border border-amber-50 bg-blue-800 text-white font-semibold items-center justify-around">
+//         <label className="btn btn-xs bg-blue-800 btn-ghost" htmlFor={tagname + "-plus"} >
+//             <svg aria-hidden="true" data-prefix="far" data-icon="plus" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" className="w-3 h-3 text-white"><path fill="currentColor" d="M368 224H224V80c0-8.84-7.16-16-16-16h-32c-8.84 0-16 7.16-16 16v144H16c-8.84 0-16 7.16-16 16v32c0 8.84 7.16 16 16 16h144v144c0 8.84 7.16 16 16 16h32c8.84 0 16-7.16 16-16V288h144c8.84 0 16-7.16 16-16v-32c0-8.84-7.16-16-16-16z"></path></svg>
+//         </label>
+//         <input type="radio" name={tagname} className="hidden" id={tagname + "-plus"} data-id={tagname}/>
+//         <span>
+//             {tagname}
+//         </span>
+//         <label className="btn btn-xs btn-ghost bg-blue-800" htmlFor={tagname + "-minus"}>
+//             <svg aria-hidden="true" data-prefix="far" data-icon="minus" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" className="w-3 h-3 text-white"><path fill="currentColor" d="M368 224H16c-8.84 0-16 7.16-16 16v32c0 8.84 7.16 16 16 16h352c8.84 0 16-7.16 16-16v-32c0-8.84-7.16-16-16-16z"></path></svg>
+//         </label>
+//         <input type="radio" name={tagname} id={tagname + "-minus"} className="hidden" data-id={tagname}/>
+//     </div>
+// }
+
+// export default Tag;
+// import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+// import { faPlus, faMinus } from "@fortawesome/free-solid-svg-icons";
+
+// const Tag = ({ tagname, onFilter, onExclude }) => {
+//   return (
+//     <div className="flex gap-3 border border-amber-50 bg-blue-800 text-white font-semibold items-center justify-around rounded-lg px-2 py-1">
+//       <button
+//         className="btn btn-xs btn-ghost bg-blue-800"
+//         onClick={() => onFilter(tagname)}
+//       >
+//          <FontAwesomeIcon icon={faPlus} className="cursor-pointer" />
+//       </button>
+//       <span>{tagname}</span>
+//       <button
+//         className="btn btn-xs bg-blue-800 btn-ghost"
+//         onClick={() => onExclude(tagname)}
+//       >
+//          <FontAwesomeIcon icon={faMinus} className="cursor-pointer" />
+//       </button>
+//     </div>
+//   );
+// };
+
+// export default Tag;
+
+// import { useEffect, useState } from 'react'
+// import reactLogo from './../assets/react.svg'
+// import viteLogo from '/vite.svg'
+// import TagFilter from './tagfilter'
+
+
+// function Filter() {
+//   const [count, setCount] = useState(0)
+//   const [tags, setTags] = useState([]) 
+//   const [loading,setLoading] = useState(false)
+//   const getall =()=>{
+    
+//   }
+//   const  gettags = async ()=>{
+//     setLoading(true)
+//      const query = `
+//       query MyQuery {
+//         tags {
+//           id
+//           name
+//         }
+//       }
+//     `;
+//     let response = await fetch("http://127.0.0.1:8000/graphql/", {
+//       method: "POST",
+//       headers: { "Content-Type": "application/json" },
+//       body: JSON.stringify({ query }),
+//     });
+
+//     const result = await response.json();
+//     setTags(result)
+//     setLoading(false)
+//     // console.log("Tags from App.jsx:", result.data.tags);
+//     setTags(result.data.tags)
+//   }
+//   useEffect(()=>{
+//     gettags()
+// },[])
+
+//   return (
+//     <>
+//     <div className='flex items-center justify-center flex-col bg-zinc-200 border-2 border-slate-950 w-3/6 mx-auto p-3'>
+//       <div className='flex space-x-4'>
+//         <a href="https://vite.dev" target="_blank">
+//           <img src={viteLogo} className="logo" alt="Vite logo" />
+//         </a>
+//         <a href="https://react.dev" target="_blank">
+//           <img src={reactLogo} className="logo react" alt="React logo" />
+//         </a>
+//       </div>
+//       <h1>Vite + React</h1>
+//       <div className="card">
+//         <button className='btn btn-outline btn-ghost btn-dash border-slate-900 shadow-md' onClick={() => setCount((count) => count + 1)}>
+//           count is {count}
+//         </button>
+//         <p>
+//           Edit <code>src/App.jsx</code> and save to test HMR
+//         </p>
+//       </div>
+//       <p className="read-the-docs">
+//         Click on the Vite and React logos to learn more
+//       </p>
+
+
+//       </div>
+
+//       {loading ? <p className='text-2xl text-red-500'>Loading...</p> :
+//       <div className='border-2 card shadow-md shadow-black bg-zinc-50 w-3/4 mx-auto my-4 glass text-black border-slate-950 p-3'>
+//         <TagFilter tags={tags} getdata={getall()} />
+//       </div>
+//       }
+//     </>
+//   )
+// }
+// export default Filter;
