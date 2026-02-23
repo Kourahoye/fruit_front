@@ -135,7 +135,7 @@ const Fruits = () => {
                     <div className="text-4xl font-thin opacity-30 tabular-nums dark:opacity-100 dark:text-white">{fruit.id}</div>
                     <div>
                         {
-                            fruit.image ? <img src={`http://localhost:8000/${fruit.image.url}`} alt={fruit.name} className="w-10 h-10 object-cover rounded-full"/> : <div className="w-10 h-10 flex items-center justify-center bg-gray-200 rounded-full text-gray-500">N/A</div>
+                            fruit.image ? <img src={`https://parinari.pythonanywhere.com//${fruit.image.url}`} alt={fruit.name} className="w-10 h-10 object-cover rounded-full"/> : <div className="w-10 h-10 flex items-center justify-center bg-gray-200 rounded-full text-gray-500">N/A</div>
                         }
                     </div>
                         </div>

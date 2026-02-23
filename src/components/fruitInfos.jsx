@@ -172,7 +172,7 @@ const FruitInfos = () => {
                 : data ? <div className="card  w-full md:w-96 h-96 bg-base-100 shadow-xl mx-auto my-auto">
                     {
                         data.getFruit.image ?
-                            <figure><img src={`http://localhost:8000/${data.getFruit.image.url}`} alt={data.getFruit.name} /></figure>
+                            <figure><img src={`https://parinari.pythonanywhere.com/${data.getFruit.image.url}`} alt={data.getFruit.name} /></figure>
                             : <div className="w-10 h-10 flex items-center justify-center bg-gray-200 rounded-full text-gray-500">N/A</div>
                     }
                     <div className="card-body">
