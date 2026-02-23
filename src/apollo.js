@@ -6,7 +6,7 @@ import { getTokens, storeTokens } from './manageTokens';
 
 // --- Client pour refresh uniquement ---
 const refreshClient = new ApolloClient({
-  link: new HttpLink({ uri: "http://127.0.0.1:8000/graphql/" }),
+  link: new HttpLink({ uri: "https://parinari.pythonanywhere.com/graphql/" }),
   cache: new InMemoryCache(),
 });
 
@@ -28,30 +28,24 @@ const errorLink = new ErrorLink(({ graphQLErrors, operation, forward }) => {
   if (graphQLErrors) {
     for (let err of graphQLErrors) {
       if (err.extensions?.code === 'UNAUTHENTICATED') {
-        return new Promise(async (resolve, reject) => {
-          try {
-            const tokens = getTokens();
+        return refreshClient.mutate({
+          mutation: REFRESH_TOKEN_MUTATION,
+          variables: { refreshToken: getTokens().refreshToken },
+        }).then(({ data }) => {
+          const { accessToken, refreshToken } = data.refreshToken;
+          storeTokens(accessToken, refreshToken);
 
-            const { data } = await refreshClient.mutate({
-              mutation: REFRESH_TOKEN_MUTATION,
-              variables: { refreshToken: tokens.refreshToken },
-            });
+          // Mettre à jour le header de l'opération initiale
+          operation.setContext(({ headers = {} }) => ({
+            headers: {
+              ...headers,
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }));
 
-            const { accessToken, refreshToken } = data.refreshToken;
-            storeTokens(accessToken, refreshToken);
-
-            // Mettre à jour le header de l'opération initiale
-            operation.setContext(({ headers = {} }) => ({
-              headers: {
-                ...headers,
-                Authorization: `Bearer ${accessToken}`,
-              },
-            }));
-
-            resolve(forward(operation));
-          } catch (error) {
-            reject(error);
-          }
+          return forward(operation);
+        }).catch((error) => {
+          throw error;
         });
       }
     }
@@ -62,7 +56,7 @@ const errorLink = new ErrorLink(({ graphQLErrors, operation, forward }) => {
 
 // --- Upload HTTP Link ---
 const uploadLink = new UploadHttpLink({
-  uri: "http://127.0.0.1:8000/graphql/",
+  uri: "https://parinari.pythonanywhere.com/graphql/zz",
 });
 
 // --- Client principal ---

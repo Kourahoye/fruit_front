@@ -3,7 +3,7 @@ import axios from "axios";
 
 // creation d'une instance axios de base
 const api = axios.create({
-    baseURL:'http://127.0.0.1:8000/',
+    baseURL:'https://parinari.pythonanywhere.com/graphql/',
     timeout:1000,
     headers:{
         'Content-Type':'application/json',
