@@ -56,7 +56,7 @@ const errorLink = new ErrorLink(({ graphQLErrors, operation, forward }) => {
 
 // --- Upload HTTP Link ---
 const uploadLink = new UploadHttpLink({
-  uri: "https://parinari.pythonanywhere.com/graphql/zz",
+  uri: "https://parinari.pythonanywhere.com/graphql/",
 });
 
 // --- Client principal ---
