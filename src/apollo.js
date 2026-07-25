@@ -28,11 +28,13 @@ const errorLink = new ErrorLink(({ graphQLErrors, operation, forward }) => {
   if (graphQLErrors) {
     for (let err of graphQLErrors) {
       if (err.extensions?.code === 'UNAUTHENTICATED') {
+        const _tokens = getTokens();
         return refreshClient.mutate({
           mutation: REFRESH_TOKEN_MUTATION,
-          variables: { refreshToken: getTokens().refreshToken },
+          variables: { refreshToken: _tokens.refreshToken },
         }).then(({ data }) => {
-          const { accessToken, refreshToken } = data.refreshToken;
+          const  accessToken = data.refreshToken.token.token;
+          const refreshToken  = data.refreshToken.token;
           storeTokens(accessToken, refreshToken);
 
           // Mettre à jour le header de l'opération initiale
@@ -45,6 +47,7 @@ const errorLink = new ErrorLink(({ graphQLErrors, operation, forward }) => {
 
           return forward(operation);
         }).catch((error) => {
+          console.error("Refresh token failed", error);
           throw error;
         });
       }
